@@ -1,11 +1,15 @@
-from flask import Flask, request, jsonify, render_template
-import joblib
+from flask import Flask, request, render_template
+import pickle
+from sklearn.feature_extraction.text import CountVectorizer
 
 app = Flask(__name__)
 
-# Load the pre-trained model and vectorizer
-dt_classifier = joblib.load('customerReview/sentiment_model.pkl')
-tfidf = joblib.load('customerReview/tfidf_vectorizer.pkl')
+# Load the trained model and vectorizer
+with open('Email_Span.pkl', 'rb') as model_file:
+    model = pickle.load(model_file)
+
+with open('vectorizer.pkl', 'rb') as vec_file:
+    vectorizer = pickle.load(vec_file)
 
 @app.route('/')
 def home():
@@ -13,17 +17,20 @@ def home():
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    review = request.json['review']
-    
-    # Preprocess and vectorize the input review
-    review_tfidf = tfidf.transform([review])
-    
-    # Predict sentiment using the trained model
-    prediction = dt_classifier.predict(review_tfidf)
-    
-    # Return the result
-    sentiment = 'positive' if prediction[0] == 1 else 'negative'
-    return jsonify({'sentiment': sentiment})
+    # Get the input email from the form
+    email = request.form['email']
+
+    # Vectorize the email
+    email_vectorized = vectorizer.transform([email])
+
+    # Predict using the Naive Bayes model
+    prediction = model.predict(email_vectorized)
+
+    # Map the result to labels
+    result = 'Spam' if prediction[0] == 1 else 'Not Spam'
+
+    # Return the result back to the HTML page
+    return render_template('index.html', prediction_text=f'The email is: {result}')
 
 if __name__ == '__main__':
     app.run(debug=True)
