@@ -1,40 +1,29 @@
 from flask import Flask, request, jsonify, render_template
-import pickle
-import numpy as np
+import joblib
 
-# Initialize the Flask app
 app = Flask(__name__)
 
-# Load the trained model
-with open('HousePrice/house_price_model.pkl', 'rb') as file:
-    model = pickle.load(file)
+# Load the pre-trained model and vectorizer
+dt_classifier = joblib.load('customerReview/sentiment_model.pkl')
+tfidf = joblib.load('customerReview/tfidf_vectorizer.pkl')
 
-# Define the home route to render the HTML form
 @app.route('/')
 def home():
     return render_template('index.html')
 
-# Define the prediction route
 @app.route('/predict', methods=['POST'])
 def predict():
-    # Get the form data from the request
-    square_footage = float(request.form['square_footage'])
-    num_bedrooms = int(request.form['num_bedrooms'])
-    num_bathrooms = int(request.form['num_bathrooms'])
-    location = request.form['location']
+    review = request.json['review']
     
-    # One-hot encode the location input
-    location_suburban = 1 if location == 'Suburban' else 0
-    location_urban = 1 if location == 'Urban' else 0
+    # Preprocess and vectorize the input review
+    review_tfidf = tfidf.transform([review])
     
-    # Create an array of the input features
-    input_features = np.array([[square_footage, num_bedrooms, num_bathrooms, location_suburban, location_urban]])
+    # Predict sentiment using the trained model
+    prediction = dt_classifier.predict(review_tfidf)
     
-    # Make the prediction using the model
-    predicted_price = model.predict(input_features)[0]
-    
-    # Render the result on the HTML page
-    return render_template('index.html', prediction_text=f'Predicted House Price: ${predicted_price:,.2f}')
+    # Return the result
+    sentiment = 'positive' if prediction[0] == 1 else 'negative'
+    return jsonify({'sentiment': sentiment})
 
 if __name__ == '__main__':
     app.run(debug=True)
